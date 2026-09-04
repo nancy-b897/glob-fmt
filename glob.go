@@ -1,6 +1,6 @@
 // Package glob parses shell-style file glob patterns into an explicit
-// syntax tree, validates them, and can render that tree back into a
-// canonical string form.
+// syntax tree, validates them, can render that tree back into a
+// canonical string form, and can match the pattern against a path.
 //
 // Supported syntax, per '/'-separated path segment:
 //

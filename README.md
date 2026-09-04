@@ -47,6 +47,15 @@ out, err := glob.Format("[^abc]*.log")
 // out == "[!abc]*.log" -- negation is normalized to '!'
 ```
 
+Once parsed, a pattern can match paths directly:
+
+```go
+p, _ := glob.Parse("src/**/*.go")
+p.Match("src/glob/parser.go") // true
+p.Match("src/glob.go")        // true
+p.Match("bin/glob")           // false
+```
+
 ## Supported syntax
 
 Per `/`-separated path segment:
@@ -65,12 +74,6 @@ Per `/`-separated path segment:
 A brace group with no top-level comma, like `{abc}`, is not treated as
 an alternation — it's left as literal text, matching how most shells
 behave.
-
-## What this does not do yet
-
-There is no matcher here — no `Pattern.Match(path string) bool`. Right
-now this is a parser and printer only. See the roadmap in the issue
-tracker for what's next.
 
 ## Known limitations
 
