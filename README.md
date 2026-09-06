@@ -77,9 +77,6 @@ behave.
 
 ## Known limitations
 
-- A brace alternative can't contain a character class with a literal
-  comma in it (`{[a,b],c}`) — the comma gets misread as the
-  alternative separator.
 - `**` and `{...}` can't span a `/`, since the pattern is split into
   path segments before either is parsed.
 

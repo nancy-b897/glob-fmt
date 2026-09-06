@@ -41,6 +41,10 @@ func TestMatch(t *testing.T) {
 		{"a/b/c", "a/b/c/d", false},
 		{"[]abc].go", "].go", true},
 		{"[]abc].go", "a.go", true},
+		{"{[a,b],c}.go", "a.go", true},
+		{"{[a,b],c}.go", ",.go", true},
+		{"{[a,b],c}.go", "c.go", true},
+		{"{[a,b],c}.go", "d.go", false},
 	}
 	for _, c := range cases {
 		t.Run(c.pattern+" "+c.path, func(t *testing.T) {

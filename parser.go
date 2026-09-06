@@ -145,19 +145,53 @@ func parseClass(toks []charTok, context string) (*CharClass, int, error) {
 	return cls, idx, nil
 }
 
+// classTokenLen reports the length, in tokens, of a bracket class
+// starting at toks[0] == '[', following the same "first position" rule
+// parseClass uses for a literal ']'. It returns ok == false if there is
+// no matching ']', in which case the caller should treat '[' as an
+// ordinary character rather than skip over its contents — callers that
+// need brace/comma structure must not mistake a ',' or '}' inside an
+// unrelated, unterminated class for one at the top level.
+func classTokenLen(toks []charTok) (n int, ok bool) {
+	idx := 1
+	if idx < len(toks) && !toks[idx].esc && (toks[idx].r == '!' || toks[idx].r == '^') {
+		idx++
+	}
+	first := true
+	for idx < len(toks) {
+		if !toks[idx].esc && toks[idx].r == ']' && !first {
+			return idx + 1, true
+		}
+		first = false
+		idx++
+	}
+	return 0, false
+}
+
 // tryParseBrace looks at toks[0] == '{' and decides whether it opens
 // an alternation group. If it does not (no matching '}', or a
 // matching one with no top-level comma), ok is false and the caller
 // treats '{' as an ordinary literal character.
+//
+// Bracket classes are skipped as a unit while scanning, so a comma or
+// brace inside "[...]" — as in "{[a,b],c}" — never confuses the search
+// for the alternation's structure.
 func tryParseBrace(toks []charTok, context string) (node Node, consumed int, ok bool, err error) {
 	depth := 1
 	hasComma := false
 	hasNested := false
 	closeIdx := -1
 
-	for i := 1; i < len(toks) && closeIdx < 0; i++ {
+	for i := 1; i < len(toks) && closeIdx < 0; {
 		t := toks[i]
+		if !t.esc && t.r == '[' {
+			if n, ok := classTokenLen(toks[i:]); ok {
+				i += n
+				continue
+			}
+		}
 		if t.esc {
+			i++
 			continue
 		}
 		switch t.r {
@@ -176,6 +210,7 @@ func tryParseBrace(toks []charTok, context string) (node Node, consumed int, ok 
 				hasComma = true
 			}
 		}
+		i++
 	}
 
 	if closeIdx < 0 || !hasComma {
@@ -200,11 +235,20 @@ func tryParseBrace(toks []charTok, context string) (node Node, consumed int, ok 
 func splitOnUnescapedComma(toks []charTok) [][]charTok {
 	var parts [][]charTok
 	start := 0
-	for i, t := range toks {
+	i := 0
+	for i < len(toks) {
+		t := toks[i]
+		if !t.esc && t.r == '[' {
+			if n, ok := classTokenLen(toks[i:]); ok {
+				i += n
+				continue
+			}
+		}
 		if !t.esc && t.r == ',' {
 			parts = append(parts, toks[start:i])
 			start = i + 1
 		}
+		i++
 	}
 	return append(parts, toks[start:])
 }

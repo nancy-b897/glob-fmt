@@ -26,6 +26,8 @@ func TestParseValid(t *testing.T) {
 		"{abc}.go",
 		"{abc",
 		`a\,b`,
+		"{[a,b],c}.go",
+		"{[!,]x,y}.go",
 	}
 	for _, in := range cases {
 		t.Run(in, func(t *testing.T) {
@@ -78,6 +80,7 @@ func TestRoundTrip(t *testing.T) {
 		`\{literal\}.txt`,
 		"[]abc].go",
 		`a\,b`,
+		"{[a,b],c}.go",
 	}
 	for _, in := range cases {
 		t.Run(in, func(t *testing.T) {
@@ -130,6 +133,34 @@ func TestBraceWithoutCommaIsLiteral(t *testing.T) {
 	seg := p.Segments[0]
 	if len(seg) != 1 || seg[0].Kind != KindLiteral || seg[0].Literal != "{abc}" {
 		t.Fatalf("expected a single literal node %q, got %#v", "{abc}", seg)
+	}
+}
+
+// TestBraceSplitIsBracketAware checks that a comma inside a "[...]"
+// class does not get mistaken for the comma that separates brace
+// alternatives.
+func TestBraceSplitIsBracketAware(t *testing.T) {
+	p, err := Parse("{[a,b],c}")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	seg := p.Segments[0]
+	if len(seg) != 1 || seg[0].Kind != KindBrace {
+		t.Fatalf("expected a single brace node, got %#v", seg)
+	}
+	alts := seg[0].Alts
+	if len(alts) != 2 {
+		t.Fatalf("expected 2 alternatives, got %d: %#v", len(alts), alts)
+	}
+	if len(alts[0]) != 1 || alts[0][0].Kind != KindClass {
+		t.Fatalf("expected first alternative to be a class, got %#v", alts[0])
+	}
+	want := []ClassItem{{Lo: 'a', Hi: 'a'}, {Lo: ',', Hi: ','}, {Lo: 'b', Hi: 'b'}}
+	if !reflect.DeepEqual(alts[0][0].Class.Items, want) {
+		t.Fatalf("Items = %#v, want %#v", alts[0][0].Class.Items, want)
+	}
+	if len(alts[1]) != 1 || alts[1][0].Kind != KindLiteral || alts[1][0].Literal != "c" {
+		t.Fatalf("expected second alternative to be literal %q, got %#v", "c", alts[1])
 	}
 }
 
