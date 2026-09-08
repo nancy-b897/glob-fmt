@@ -75,6 +75,20 @@ A brace group with no top-level comma, like `{abc}`, is not treated as
 an alternation — it's left as literal text, matching how most shells
 behave.
 
+## Command-line tool
+
+`cmd/globfmt` wraps `Format` for use in scripts:
+
+```sh
+go run ./cmd/globfmt 'src/**/*.{go,txt}' '[^abc]*.log'
+# src/**/*.{go,txt}
+# [!abc]*.log
+```
+
+With no arguments it reads one pattern per line from stdin. An
+invalid pattern is reported on stderr and gives a nonzero exit
+status, but the rest of the patterns are still processed.
+
 ## Known limitations
 
 - `**` and `{...}` can't span a `/`, since the pattern is split into
