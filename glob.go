@@ -17,12 +17,16 @@
 // A brace group with no top-level comma (e.g. "{abc}") is not an
 // alternation; it is left as literal text, which is how most shells
 // treat it too.
+//
+// A brace alternative may itself contain '/', so that e.g.
+// "src/{a/b,c}/d" matches both "src/a/b/d" and "src/c/d". A brace
+// group used this way must be the entire path segment — it cannot
+// share a segment with a literal prefix or suffix, since there would
+// be no unambiguous way to split that prefix or suffix across the
+// alternative's own '/'.
 package glob
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
 // NodeKind identifies the kind of a parsed pattern node.
 type NodeKind int
@@ -41,8 +45,14 @@ type Node struct {
 	Kind    NodeKind
 	Literal string     // set when Kind == KindLiteral
 	Class   *CharClass // set when Kind == KindClass
-	Alts    [][]Node   // set when Kind == KindBrace; one slice per alternative
+	Alts    []Alt      // set when Kind == KindBrace; one per alternative
 }
+
+// Alt is one alternative inside a brace group, itself split into path
+// segments the same way a whole Pattern is. Most alternatives are a
+// single segment; one with more than one lets the brace group span a
+// '/' (see the package doc comment).
+type Alt [][]Node
 
 // CharClass is a parsed "[...]" character class.
 type CharClass struct {
@@ -67,14 +77,13 @@ func Parse(pattern string) (*Pattern, error) {
 	if pattern == "" {
 		return nil, fmt.Errorf("glob: empty pattern")
 	}
-	rawSegs := strings.Split(pattern, "/")
-	segs := make([][]Node, len(rawSegs))
-	for i, raw := range rawSegs {
-		nodes, err := parseSegment(raw, pattern)
-		if err != nil {
-			return nil, err
-		}
-		segs[i] = nodes
+	toks, err := tokenize(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("glob: invalid pattern %q: %w", pattern, err)
+	}
+	segs, err := parseSegments(toks, pattern)
+	if err != nil {
+		return nil, err
 	}
 	return &Pattern{Segments: segs}, nil
 }

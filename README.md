@@ -75,6 +75,12 @@ A brace group with no top-level comma, like `{abc}`, is not treated as
 an alternation — it's left as literal text, matching how most shells
 behave.
 
+A brace alternative can itself contain `/`, so `src/{a/b,c}/d` matches
+both `src/a/b/d` and `src/c/d`. Used this way, the brace group must be
+the entire path segment — it can't share a segment with a literal
+prefix or suffix, since there'd be no unambiguous way to split that
+prefix or suffix across the alternative's own `/`.
+
 ## Command-line tool
 
 `cmd/globfmt` wraps `Format` for use in scripts:
@@ -91,8 +97,9 @@ status, but the rest of the patterns are still processed.
 
 ## Known limitations
 
-- `**` and `{...}` can't span a `/`, since the pattern is split into
-  path segments before either is parsed.
+- `**` can't span a `/` as part of a brace alternative — `{**,b}` is
+  rejected, since `**` only has meaning as an entire path segment of
+  the pattern itself.
 
 ## License
 

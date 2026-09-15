@@ -12,7 +12,9 @@ func (p *Pattern) Match(path string) bool {
 // matchSegments walks the pattern's path segments against the path's
 // path segments in lockstep, except for a lone "**" segment, which is
 // allowed to absorb zero or more path segments before the rest of the
-// pattern resumes.
+// pattern resumes, and a lone brace segment with a spanning
+// alternative, which absorbs however many path segments that
+// alternative covers.
 func matchSegments(pats [][]Node, segs []string) bool {
 	if len(pats) == 0 {
 		return len(segs) == 0
@@ -20,6 +22,17 @@ func matchSegments(pats [][]Node, segs []string) bool {
 	if isDoubleStar(pats[0]) {
 		for i := 0; i <= len(segs); i++ {
 			if matchSegments(pats[1:], segs[i:]) {
+				return true
+			}
+		}
+		return false
+	}
+	if brace, ok := spanningBrace(pats[0]); ok {
+		for _, alt := range brace.Alts {
+			if len(segs) < len(alt) {
+				continue
+			}
+			if matchAlt(alt, segs[:len(alt)]) && matchSegments(pats[1:], segs[len(alt):]) {
 				return true
 			}
 		}
@@ -33,6 +46,36 @@ func matchSegments(pats [][]Node, segs []string) bool {
 
 func isDoubleStar(seg []Node) bool {
 	return len(seg) == 1 && seg[0].Kind == KindDoubleStar
+}
+
+// spanningBrace reports whether seg is a lone brace node with at
+// least one alternative that spans more than one path segment. The
+// parser only allows such a brace when it is the entire segment, so
+// this is the only shape matchSegments needs to special-case; an
+// ordinary brace mixed with other nodes is handled inside matchNodes
+// like any other node, since all its alternatives are a single
+// segment.
+func spanningBrace(seg []Node) (Node, bool) {
+	if len(seg) != 1 || seg[0].Kind != KindBrace {
+		return Node{}, false
+	}
+	for _, alt := range seg[0].Alts {
+		if len(alt) != 1 {
+			return seg[0], true
+		}
+	}
+	return Node{}, false
+}
+
+// matchAlt matches each path segment of a brace alternative against
+// the corresponding element of segs, which must be the same length.
+func matchAlt(alt Alt, segs []string) bool {
+	for i, nodes := range alt {
+		if !matchNodes(nodes, []rune(segs[i])) {
+			return false
+		}
+	}
+	return true
 }
 
 // matchNodes reports whether the node sequence matches all of s. Star
@@ -75,9 +118,13 @@ func matchNodes(nodes []Node, s []rune) bool {
 		}
 		return false
 	case KindBrace:
+		// Reaching a brace here (rather than through spanningBrace in
+		// matchSegments) means every alternative is a single segment
+		// — the parser rejects any other shape unless the brace is
+		// the whole path segment.
 		for _, alt := range n.Alts {
-			combined := make([]Node, 0, len(alt)+len(rest))
-			combined = append(combined, alt...)
+			combined := make([]Node, 0, len(alt[0])+len(rest))
+			combined = append(combined, alt[0]...)
 			combined = append(combined, rest...)
 			if matchNodes(combined, s) {
 				return true

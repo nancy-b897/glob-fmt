@@ -50,7 +50,7 @@ func escapeLiteral(s string) string {
 	var b strings.Builder
 	for _, r := range s {
 		switch r {
-		case '\\', '*', '?', '[', ']', '{', '}', ',':
+		case '\\', '*', '?', '[', ']', '{', '}', ',', '/':
 			b.WriteByte('\\')
 		}
 		b.WriteRune(r)
@@ -90,10 +90,14 @@ func printClass(c *CharClass) string {
 	return b.String()
 }
 
-func printBrace(alts [][]Node) string {
+func printBrace(alts []Alt) string {
 	parts := make([]string, len(alts))
 	for i, a := range alts {
-		parts[i] = printNodes(a)
+		segs := make([]string, len(a))
+		for j, seg := range a {
+			segs[j] = printNodes(seg)
+		}
+		parts[i] = strings.Join(segs, "/")
 	}
 	return "{" + strings.Join(parts, ",") + "}"
 }
